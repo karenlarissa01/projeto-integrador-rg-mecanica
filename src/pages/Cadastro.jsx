@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { supabase } from "../lib/supabase";
 
 function Cadastro() {
   const [error, setError] = useState("");
@@ -37,11 +38,16 @@ function Cadastro() {
     event.target.value = value;
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     const formData = new FormData(event.currentTarget);
+
+    const name = formData.get("name");
     const birthDate = formData.get("birthDate");
+    const cpf = formData.get("cpf");
+    const email = formData.get("email");
+    const phone = formData.get("phone");
     const password = formData.get("password");
     const confirmPassword = formData.get("confirmPassword");
 
@@ -71,7 +77,43 @@ function Cadastro() {
       return;
     }
 
+    const cpfLimpo = cpf.replace(/\D/g, "");
+    const telefoneLimpo = phone.replace(/\D/g, "");
+
+    if (cpfLimpo.length !== 11) {
+      setError("O CPF deve possuir 11 dígitos.");
+      return;
+    }
+
+    const { error: supabaseError } = await supabase
+      .from("cliente")
+      .insert([
+        {
+          nome_cli: name,
+          email_cli: email,
+          telefone_cli: telefoneLimpo,
+          data_nasc_cli: birthDate,
+          cpf_cli: cpfLimpo,
+        },
+      ]);
+
+    if (supabaseError) {
+      console.error("Erro do Supabase:", supabaseError);
+
+      if (supabaseError.code === "23505") {
+        setError("E-mail ou CPF já cadastrado.");
+        return;
+      }
+
+      setError("Não foi possível realizar o cadastro.");
+      return;
+    }
+
     setError("");
+
+    alert("Cadastro realizado com sucesso!");
+
+    event.currentTarget.reset();
   };
 
   return (
