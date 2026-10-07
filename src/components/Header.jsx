@@ -11,7 +11,7 @@ function Header() {
     <header className="header">
       <div className="container header__container">
         <Link to="/" className="header__logo">
-          <img src="Images/logo.png" alt="RG Mecânica" />
+          <img src="/images/logo.png" alt="RG Mecânica" />
         </Link>
 
         <nav className="header__nav" aria-label="Navegação principal">

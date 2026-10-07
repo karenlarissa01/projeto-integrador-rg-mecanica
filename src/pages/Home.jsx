@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import ServiceCard from "../components/ServiceCard";
-import services from "../data/service";
+import services from "../data/services";
 
 function Home() {
   return (

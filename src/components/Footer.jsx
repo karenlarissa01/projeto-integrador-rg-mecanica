@@ -5,7 +5,7 @@ function Footer() {
     <footer className="footer">
       <div className="container footer__main">
         <Link to="/" className="footer__logo">
-          <img src="Images/logo.png" alt="RG Mecânica" />
+          <img src="/images/logo.png" alt="RG Mecânica" />
         </Link>
 
         <nav className="footer__nav" aria-label="Navegação do rodapé">
