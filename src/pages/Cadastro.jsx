@@ -1,71 +1,118 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { supabase } from "../lib/supabase";
+import { Link, useNavigate } from "react-router-dom";
 
 function Cadastro() {
   const [error, setError] = useState("");
 
-  const handlePhoneChange = (event) => {
+  const navigate = useNavigate();
 
-    let value = event.target.value.replace(/\D/g, "");
+  const formatarTelefone = (valor) => {
+    let telefone = valor.replace(/\D/g, "").slice(0, 11);
 
-    value = value.slice(0, 11);
-
-    if (value.length > 7) {
-      value = value.replace(
+    if (telefone.length > 7) {
+      telefone = telefone.replace(
         /^(\d{2})(\d{5})(\d{0,4}).*/,
         "($1) $2-$3"
       );
-    } else if (value.length > 2) {
-      value = value.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
-    } else if (value.length > 0) {
-      value = value.replace(/^(\d{0,2})/, "($1");
+    } else if (telefone.length > 2) {
+      telefone = telefone.replace(
+        /^(\d{2})(\d{0,5})/,
+        "($1) $2"
+      );
+    } else if (telefone.length > 0) {
+      telefone = telefone.replace(
+        /^(\d{0,2})/,
+        "($1"
+      );
     }
 
-    event.target.value = value;
+    return telefone;
+  };
+
+  const formatarCpf = (valor) => {
+    let cpf = valor.replace(/\D/g, "").slice(0, 11);
+
+    cpf = cpf
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/\.(\d{3})(\d)/, ".$1-$2");
+
+    return cpf;
+  };
+
+  const calcularIdade = (dataNascimento) => {
+    const nascimento = new Date(
+      `${dataNascimento}T00:00:00`
+    );
+
+    const hoje = new Date();
+
+    let idade =
+      hoje.getFullYear() - nascimento.getFullYear();
+
+    const aniversarioAindaNaoAconteceu =
+      hoje.getMonth() < nascimento.getMonth() ||
+      (hoje.getMonth() === nascimento.getMonth() &&
+        hoje.getDate() < nascimento.getDate());
+
+    if (aniversarioAindaNaoAconteceu) {
+      idade--;
+    }
+
+    return idade;
+  };
+
+  const handlePhoneChange = (event) => {
+    event.target.value = formatarTelefone(
+      event.target.value
+    );
   };
 
   const handleCpfChange = (event) => {
-    let value = event.target.value.replace(/\D/g, "");
+    event.target.value = formatarCpf(
+      event.target.value
+    );
+  };
 
-    value = value.slice(0, 11);
+  const handleBirthDateInput = (event) => {
+    const value = event.target.value;
 
-    value = value
-    .replace(/^(\d{3})(\d)/, "$1.$2")
-    .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
-    .replace(/\.(\d{3})(\d)/, ".$1-$2");
+    if (!value) {
+      return;
+    }
 
-    event.target.value = value;
+    const year = value.split("-")[0];
+
+    if (year.length > 4) {
+      event.target.value = "";
+    }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
+    const formData = new FormData(
+      event.currentTarget
+    );
 
     const name = formData.get("name");
     const birthDate = formData.get("birthDate");
     const cpf = formData.get("cpf");
-    const email = formData.get("email");
+    const email = formData
+      .get("email")
+      .trim()
+      .toLowerCase();
     const phone = formData.get("phone");
     const password = formData.get("password");
-    const confirmPassword = formData.get("confirmPassword");
+    const confirmPassword = formData.get(
+      "confirmPassword"
+    );
 
-    const birth = new Date(`${birthDate}T00:00:00`);
-    const today = new Date();
+    const cpfLimpo = cpf.replace(/\D/g, "");
+    const telefoneLimpo = phone.replace(/\D/g, "");
+    const idade = calcularIdade(birthDate);
 
-    let age = today.getFullYear() - birth.getFullYear();
-
-    const birthdayHasNotHappenedYet =
-      today.getMonth() < birth.getMonth() ||
-      (today.getMonth() === birth.getMonth() &&
-        today.getDate() < birth.getDate());
-
-    if (birthdayHasNotHappenedYet) {
-      age--;
-    }
-
-    if (age < 18) {
+    if (idade < 18) {
       setError(
         "É preciso ser maior de idade para concluir a criação da conta"
       );
@@ -73,47 +120,63 @@ function Cadastro() {
     }
 
     if (password !== confirmPassword) {
-      setError("As senhas informadas não coincidem.");
+      setError(
+        "As senhas informadas não coincidem."
+      );
       return;
     }
-
-    const cpfLimpo = cpf.replace(/\D/g, "");
-    const telefoneLimpo = phone.replace(/\D/g, "");
 
     if (cpfLimpo.length !== 11) {
-      setError("O CPF deve possuir 11 dígitos.");
-      return;
-    }
-
-    const { error: supabaseError } = await supabase
-      .from("cliente")
-      .insert([
-        {
-          nome_cli: name,
-          email_cli: email,
-          telefone_cli: telefoneLimpo,
-          data_nasc_cli: birthDate,
-          cpf_cli: cpfLimpo,
-        },
-      ]);
-
-    if (supabaseError) {
-      console.error("Erro do Supabase:", supabaseError);
-
-      if (supabaseError.code === "23505") {
-        setError("E-mail ou CPF já cadastrado.");
-        return;
-      }
-
-      setError("Não foi possível realizar o cadastro.");
+      setError(
+        "O CPF deve possuir 11 dígitos."
+      );
       return;
     }
 
     setError("");
 
-    alert("Cadastro realizado com sucesso!");
+    try {
+      const response = await fetch(
+        "http://localhost:3000/cadastro",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            nome: name,
+            email,
+            telefone: telefoneLimpo,
+            dataNascimento: birthDate,
+            cpf: cpfLimpo,
+            senha: password,
+          }),
+        }
+      );
 
-    event.currentTarget.reset();
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(
+          data.erro ||
+            "Não foi possível realizar o cadastro."
+        );
+        return;
+      }
+
+      alert("Cadastro realizado com sucesso!");
+
+      navigate("/login");
+    } catch (error) {
+      console.error(
+        "Erro ao conectar com o backend:",
+        error
+      );
+
+      setError(
+        "Não foi possível conectar com o servidor. Verifique se o backend está ligado."
+      );
+    }
   };
 
   return (
@@ -121,16 +184,24 @@ function Cadastro() {
       <div className="auth__card auth__card--large">
         <div className="auth__heading">
           <div className="section-title__line" />
+
           <h1>Crie sua conta</h1>
+
           <p>
-            Preencha seus dados para realizar seus agendamentos na RG
-            Mecânica.
+            Preencha seus dados para realizar seus
+            agendamentos na RG Mecânica.
           </p>
         </div>
 
-        <form className="auth__form" onSubmit={handleSubmit}>
+        <form
+          className="auth__form"
+          onSubmit={handleSubmit}
+        >
           <div className="form-group">
-            <label htmlFor="name">Nome completo</label>
+            <label htmlFor="name">
+              Nome completo
+            </label>
+
             <input
               id="name"
               name="name"
@@ -142,29 +213,25 @@ function Cadastro() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="birthDate">Data de nascimento</label>
+            <label htmlFor="birthDate">
+              Data de nascimento
+            </label>
+
             <input
-            id="birthDate"
-            name="birthDate"
-            type="date"
-            autoComplete="bday"
-            required
-            onInput={(event) => {
-              const value = event.target.value;
-
-              if (value) {
-                const year = value.split("-")[0];
-
-                if (year.length > 4) {
-                  event.target.value = "";
-                }
-              }
-            }}
-          />
+              id="birthDate"
+              name="birthDate"
+              type="date"
+              autoComplete="bday"
+              onInput={handleBirthDateInput}
+              required
+            />
           </div>
 
-            <div className="form-group">
-            <label htmlFor="cpf">CPF</label>
+          <div className="form-group">
+            <label htmlFor="cpf">
+              CPF
+            </label>
+
             <input
               id="cpf"
               name="cpf"
@@ -178,7 +245,10 @@ function Cadastro() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="register-email">E-mail</label>
+            <label htmlFor="register-email">
+              E-mail
+            </label>
+
             <input
               id="register-email"
               name="email"
@@ -190,7 +260,10 @@ function Cadastro() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="phone">Telefone</label>
+            <label htmlFor="phone">
+              Telefone
+            </label>
+
             <input
               id="phone"
               name="phone"
@@ -205,33 +278,42 @@ function Cadastro() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="register-password">Senha</label>
+            <label htmlFor="register-password">
+              Senha
+            </label>
+
             <input
               id="register-password"
               name="password"
               type="password"
               placeholder="Crie uma senha"
               autoComplete="new-password"
-              minLength="6"
+              minLength={6}
               required
             />
           </div>
 
           <div className="form-group">
-            <label htmlFor="confirm-password">Confirmar senha</label>
+            <label htmlFor="confirm-password">
+              Confirmar senha
+            </label>
+
             <input
               id="confirm-password"
               name="confirmPassword"
               type="password"
               placeholder="Digite sua senha novamente"
               autoComplete="new-password"
-              minLength="6"
+              minLength={6}
               required
             />
           </div>
 
           {error && (
-            <p className="form-error" role="alert">
+            <p
+              className="form-error"
+              role="alert"
+            >
               {error}
             </p>
           )}
@@ -244,7 +326,10 @@ function Cadastro() {
           </button>
 
           <p className="auth__alternative">
-            Já possui uma conta? <Link to="/login">Entrar</Link>
+            Já possui uma conta?{" "}
+            <Link to="/login">
+              Entrar
+            </Link>
           </p>
         </form>
       </div>

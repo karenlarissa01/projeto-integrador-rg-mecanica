@@ -1,8 +1,15 @@
 import { Link } from "react-router-dom";
+
 import ServiceCard from "../components/ServiceCard";
 import services from "../data/services";
 
 function Home() {
+  const usuarioLogado = localStorage.getItem("usuario");
+
+  const destinoAgendamento = usuarioLogado
+    ? "/agendamento"
+    : "/login";
+
   return (
     <>
       <section className="hero" id="inicio">
@@ -20,11 +27,17 @@ function Home() {
           </p>
 
           <div className="hero__actions">
-            <Link to="/login" className="button button--primary">
+            <Link
+              to={destinoAgendamento}
+              className="button button--primary"
+            >
               Agendar serviço
             </Link>
 
-            <a href="#servicos" className="button button--outline">
+            <a
+              href="#servicos"
+              className="button button--outline"
+            >
               Conheça nossos serviços
               <span aria-hidden="true">↓</span>
             </a>
@@ -41,7 +54,10 @@ function Home() {
 
           <div className="services__grid">
             {services.map((service) => (
-              <ServiceCard key={service.id} service={service} />
+              <ServiceCard
+                key={service.id}
+                service={service}
+              />
             ))}
           </div>
         </div>
@@ -61,12 +77,16 @@ function Home() {
 
             <div className="contact__details">
               <div className="contact__item">
-                <span className="contact__icon" aria-hidden="true">
+                <span
+                  className="contact__icon"
+                  aria-hidden="true"
+                >
                   ●
                 </span>
 
                 <div>
                   <h3>Endereço</h3>
+
                   <p>
                     Rua Evangelista de Souza, 1282
                     <br />
@@ -76,12 +96,16 @@ function Home() {
               </div>
 
               <div className="contact__item">
-                <span className="contact__icon" aria-hidden="true">
+                <span
+                  className="contact__icon"
+                  aria-hidden="true"
+                >
                   ☎
                 </span>
 
                 <div>
                   <h3>WhatsApp</h3>
+
                   <a
                     href="https://wa.me/5511989493145"
                     target="_blank"

@@ -1,8 +1,75 @@
-import { Link } from "react-router-dom";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 function Login() {
-  const handleSubmit = (event) => {
+  const [error, setError] = useState("");
+
+  const navigate = useNavigate();
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
+
+    const formData = new FormData(event.currentTarget);
+
+    const email = formData
+      .get("email")
+      .trim()
+      .toLowerCase();
+
+    const password = formData.get("password");
+
+    setError("");
+
+    try {
+      const response = await fetch(
+        "http://localhost:3000/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email,
+            senha: password,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.codigo === "EMAIL_NAO_ENCONTRADO") {
+          alert(
+            "E-mail não localizado. Cadastre-se para fazer o login."
+          );
+
+          navigate("/cadastro");
+          return;
+        }
+
+        setError(
+          data.erro ||
+            "Não foi possível realizar o login."
+        );
+        return;
+      }
+
+      localStorage.setItem(
+        "usuario",
+        JSON.stringify(data.cliente)
+      );
+
+      navigate("/");
+    } catch (error) {
+      console.error(
+        "Erro ao conectar com o backend:",
+        error
+      );
+
+      setError(
+        "Não foi possível conectar com o servidor. Verifique se o backend está ligado."
+      );
+    }
   };
 
   return (
@@ -10,13 +77,23 @@ function Login() {
       <div className="auth__card">
         <div className="auth__heading">
           <div className="section-title__line" />
+
           <h1>Entrar</h1>
-          <p>Entre na sua conta para acessar seus agendamentos.</p>
+
+          <p>
+            Entre na sua conta para acessar seus agendamentos.
+          </p>
         </div>
 
-        <form className="auth__form" onSubmit={handleSubmit}>
+        <form
+          className="auth__form"
+          onSubmit={handleSubmit}
+        >
           <div className="form-group">
-            <label htmlFor="login-email">E-mail</label>
+            <label htmlFor="login-email">
+              E-mail
+            </label>
+
             <input
               id="login-email"
               name="email"
@@ -28,7 +105,10 @@ function Login() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="login-password">Senha</label>
+            <label htmlFor="login-password">
+              Senha
+            </label>
+
             <input
               id="login-password"
               name="password"
@@ -39,6 +119,15 @@ function Login() {
             />
           </div>
 
+          {error && (
+            <p
+              className="form-error"
+              role="alert"
+            >
+              {error}
+            </p>
+          )}
+
           <button
             className="button button--primary auth__button"
             type="submit"
@@ -47,7 +136,10 @@ function Login() {
           </button>
 
           <p className="auth__alternative">
-            Não tem uma conta? <Link to="/cadastro">Cadastre-se</Link>
+            Não tem uma conta?{" "}
+            <Link to="/cadastro">
+              Cadastre-se
+            </Link>
           </p>
         </form>
       </div>

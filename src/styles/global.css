@@ -107,6 +107,18 @@ img {
   color: var(--yellow);
 }
 
+.button--outline-dark {
+  border-color: #b7b7b7;
+  background: transparent;
+  color: #222;
+}
+
+.button--outline-dark:hover {
+  border-color: var(--yellow);
+  background: var(--white);
+  color: #8c6c00;
+}
+
 .header {
   position: relative;
   z-index: 100;
@@ -190,6 +202,20 @@ img {
 }
 
 .header__login:hover {
+  color: var(--yellow);
+}
+
+.header__logout {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #d7d7d7;
+  font: inherit;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.header__logout:hover {
   color: var(--yellow);
 }
 
@@ -662,11 +688,185 @@ img {
   text-decoration: underline;
 }
 
+.page-section,
+.client-account {
+  min-height: 650px;
+  padding: 65px 0 80px;
+  background: var(--off-white);
+}
+
+.page-section .section-title__line,
+.client-account .section-title__line {
+  width: 145px;
+  margin-bottom: 14px;
+}
+
+.page-section h1,
+.client-account h1 {
+  margin-bottom: 10px;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.page-section > .container > p,
+.client-account__heading p {
+  color: var(--gray);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.page-section__actions {
+  margin-top: 25px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.client-account__heading {
+  margin-bottom: 38px;
+}
+
+.client-account__heading h1 {
+  margin-bottom: 8px;
+}
+
+.client-account__heading p {
+  font-size: 16px;
+}
+
+.client-account__options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 22px;
+}
+
+.client-account__card {
+  min-height: 210px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #e1e1e1;
+  border-radius: var(--radius);
+  background: var(--white);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.client-account__card:hover {
+  transform: translateY(-5px);
+  border-color: var(--yellow);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.11);
+}
+
+.client-account__card h2 {
+  margin-bottom: 12px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.client-account__card p {
+  margin-bottom: 24px;
+  color: var(--gray);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.client-account__card span {
+  margin-top: auto;
+  color: #9d7900;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.client-account__card:hover span {
+  color: #705700;
+}
+
+.vehicles-list {
+  margin: 35px 0 30px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.vehicle-card {
+  position: relative;
+  padding: 25px;
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--white);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.07);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+.vehicle-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: var(--yellow);
+}
+
+.vehicle-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.11);
+}
+
+.vehicle-card h2 {
+  margin-bottom: 17px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.vehicle-card p {
+  margin-bottom: 8px;
+  color: var(--gray);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vehicle-card strong {
+  color: #222;
+}
+
+.page-section .auth__form {
+  width: min(100%, 620px);
+  margin-top: 30px;
+  margin-bottom: 28px;
+  padding: 32px;
+  border-radius: var(--radius);
+  background: var(--white);
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.07);
+}
+
+.page-section .auth__form .button {
+  width: 100%;
+  margin-top: 3px;
+  border: 0;
+}
+
 .form-error {
   padding: 10px 12px;
   border-radius: 5px;
   background: #fff0f0;
   color: #a50000;
+  font-size: 12px;
+}
+
+.form-success {
+  margin: 20px 0;
+  padding: 11px 13px;
+  border-radius: 5px;
+  background: #eef8ee;
+  color: #23752c;
   font-size: 12px;
 }
 
@@ -692,6 +892,14 @@ img {
   .footer__contact {
     flex-direction: column;
     gap: 7px;
+  }
+
+  .client-account__options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .vehicles-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -723,7 +931,8 @@ img {
     gap: 12px;
   }
 
-  .header__login {
+  .header__login,
+  .header__logout {
     font-size: 12px;
   }
 
@@ -803,10 +1012,7 @@ img {
     gap: 23px;
   }
 
-  .footer__nav {
-    margin: 0;
-  }
-
+  .footer__nav,
   .footer__contact {
     margin: 0;
   }
@@ -824,5 +1030,37 @@ img {
 
   .auth__card {
     padding: 30px 22px;
+  }
+
+  .page-section,
+  .client-account {
+    padding: 45px 0 60px;
+  }
+
+  .page-section h1,
+  .client-account h1 {
+    font-size: 27px;
+  }
+
+  .client-account__options,
+  .vehicles-list {
+    grid-template-columns: 1fr;
+  }
+
+  .client-account__card {
+    min-height: 180px;
+    padding: 23px;
+  }
+
+  .page-section .auth__form {
+    padding: 24px 20px;
+  }
+
+  .page-section__actions {
+    flex-direction: column;
+  }
+
+  .page-section__actions .button {
+    width: 100%;
   }
 }
