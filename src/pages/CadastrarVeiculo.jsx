@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { API_URL } from "../config/api";
 
 function CadastrarVeiculo() {
   const [error, setError] = useState("");
@@ -58,7 +59,7 @@ function CadastrarVeiculo() {
 
     try {
       const response = await fetch(
-        "http://localhost:3000/veiculos",
+        `${API_URL}/veiculos`,
         {
           method: "POST",
           headers: {

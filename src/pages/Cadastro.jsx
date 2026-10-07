@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { API_URL } from "../config/api";
 
 function Cadastro() {
   const [error, setError] = useState("");
@@ -137,22 +138,22 @@ function Cadastro() {
 
     try {
       const response = await fetch(
-        "http://localhost:3000/cadastro",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            nome: name,
-            email,
-            telefone: telefoneLimpo,
-            dataNascimento: birthDate,
-            cpf: cpfLimpo,
-            senha: password,
-          }),
-        }
-      );
+      `${API_URL}/cadastro`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          nome: name,
+          email,
+          telefone: telefoneLimpo,
+          dataNascimento: birthDate,
+          cpf: cpfLimpo,
+          senha: password,
+        }),
+      }
+    );
 
       const data = await response.json();
 

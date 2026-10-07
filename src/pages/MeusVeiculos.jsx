@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { API_URL } from "../config/api";
 
 function MeusVeiculos() {
   const [veiculos, setVeiculos] = useState([]);
@@ -29,7 +30,7 @@ function MeusVeiculos() {
 
       try {
         const response = await fetch(
-          `http://localhost:3000/veiculos/${usuario.id}`
+        `${API_URL}/veiculos/${usuario.id}`
         );
 
         const data = await response.json();
