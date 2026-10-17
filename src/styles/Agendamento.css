@@ -1,0 +1,280 @@
+
+.agendamento-page {
+  padding-bottom: 64px;
+}
+
+.agendamento-intro {
+  margin: 12px 0 32px;
+  color: #666;
+  line-height: 1.6;
+}
+
+.agendamento-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.calendario-card,
+.agendamento-form-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+}
+
+.calendario-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.calendario-cabecalho h2,
+.agendamento-form-card h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  text-transform: capitalize;
+}
+
+.calendario-cabecalho button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 1.6rem;
+}
+
+.calendario-cabecalho button:hover {
+  background: #f3f4f6;
+}
+
+.calendario-grade {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calendario-dia-semana {
+  padding: 8px 0;
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.calendario-dia {
+  min-width: 0;
+  aspect-ratio: 1;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #fff;
+  color: #222;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.calendario-dia:not(:disabled):hover {
+  border-color: #ffd21c;
+  background: #eff6ff;
+}
+
+.calendario-dia.selecionado {
+  background: #f4c400;;
+  border-color: #b4a51b;
+  color: #fff;
+  font-weight: 700;
+}
+
+.calendario-dia.indisponivel {
+  background: #f3f4f6;
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.calendario-dia.vazio {
+  border-color: transparent;
+  background: transparent;
+}
+
+.calendario-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+  font-size: 0.8rem;
+  color: #555;
+}
+
+.calendario-legenda span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.calendario-legenda i {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.legenda-disponivel {
+  background: #f4c400;;
+  border: 1px solid #9ca3af;
+}
+
+.legenda-indisponivel {
+  background: #d1d5db;
+}
+
+.calendario-aviso,
+.texto-auxiliar {
+  color: #6b7280;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.calendario-aviso {
+  margin: 16px 0 0;
+}
+
+.data-escolhida {
+  margin: 16px 0 24px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #000000;;
+  font-size: 0.9rem;
+}
+
+.agendamento-form-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.agendamento-form-card label {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.agendamento-form-card select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+
+.agendamento-botao {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 8px;
+  background: #d4ac08;;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.agendamento-botao:hover:not(:disabled) {
+  background: #c2a328;
+}
+
+.agendamento-botao:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mensagem-sucesso,
+.mensagem-erro {
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.mensagem-sucesso {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.mensagem-erro {
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+
+
+/* Campo de observações */
+.agendamento-form-card textarea {
+  width: 100%;
+  min-height: 100px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  margin-bottom: 18px;
+
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #1f2937;
+
+  background-color: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+
+  resize: vertical;
+  box-sizing: border-box;
+
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* Texto de exemplo */
+.agendamento-form-card textarea::placeholder {
+  color: #9ca3af;
+}
+
+/* Quando o usuário clica no campo */
+.agendamento-form-card textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+/* Estado desabilitado, se necessário */
+.agendamento-form-card textarea:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+
+@media (max-width: 800px) {
+  .agendamento-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .calendario-card,
+  .agendamento-form-card {
+    padding: 16px;
+  }
+
+  .calendario-grade {
+    gap: 4px;
+  }
+
+  .calendario-dia {
+    border-radius: 7px;
+    font-size: 0.85rem;
+  }
+}
