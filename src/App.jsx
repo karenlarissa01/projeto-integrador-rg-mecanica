@@ -11,6 +11,7 @@ import MeusAgendamentos from "./pages/MeusAgendamentos";
 import MeusVeiculos from "./pages/MeusVeiculos";
 import CadastrarVeiculo from "./pages/CadastrarVeiculo";
 import Agendamento from "./pages/Agendamento";
+import HistoricoServico from "./pages/HistoricoServico";
 
 function App() {
   return (
@@ -56,6 +57,10 @@ function App() {
           }
         />
 
+        <Route
+          path="/HistoricoServico"
+          element={<HistoricoServico />}
+        />
         <Route
           path="/agendamento"
           element={
