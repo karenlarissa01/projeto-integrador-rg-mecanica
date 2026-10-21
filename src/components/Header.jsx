@@ -88,12 +88,12 @@ function Header() {
             </Link>
           )}
 
-          <Link
+          {/* <Link
             to={usuario ? "/agendamento" : "/login"}
             className="button button--primary header__schedule"
           >
             Agendar serviço
-          </Link>
+          </Link> */}
         </div>
       </div>
     </header>
