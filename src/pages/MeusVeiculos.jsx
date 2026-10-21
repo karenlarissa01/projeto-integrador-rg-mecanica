@@ -619,19 +619,15 @@ function MeusVeiculos() {
 
           </div>
 
-          <button
-
-            type="button"
-
-            className="button button--primary vehicles-page__add"
-
-            onClick={abrirCadastro}
-
-          >
-
-            <span aria-hidden="true">+</span> Adicionar veículo
-
-          </button>
+          {!carregando && veiculos.length >= 1 && (
+            <button
+              type="button"
+              className="button button--primary vehicles-page__add"
+              onClick={abrirCadastro}
+            >
+              <span aria-hidden="true">+</span> Adicionar veículo
+            </button>
+          )}
 
         </header>
 
