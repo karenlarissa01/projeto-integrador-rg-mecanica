@@ -1,25 +1,20 @@
 
+import "dotenv/config";
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
 import bcrypt from "bcrypt";
 import { pool } from "./db.js";
-import { createClient } from "@supabase/supabase-js";
-
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const BCRYPT_SALT_ROUNDS = 10;
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 app.use(cors());
 app.use(express.json());
+
+/* =====================================================
+   FUNÇÕES AUXILIARES
+===================================================== */
 
 const normalizarEmail = (email) =>
   email.trim().toLowerCase();
@@ -30,11 +25,76 @@ const normalizarPlaca = (placa) =>
 const removerCaracteresNaoNumericos = (valor) =>
   valor.replace(/\D/g, "");
 
+const idValido = (valor) =>
+  Number.isInteger(Number(valor)) && Number(valor) > 0;
+
+const erroBanco = (erro) => {
+  console.error("Erro PostgreSQL:", {
+    code: erro.code,
+    message: erro.message,
+    constraint: erro.constraint,
+  });
+};
+
+const validarData = (data) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    return false;
+  }
+
+  const [ano, mes, dia] = data.split("-").map(Number);
+  const dataTeste = new Date(ano, mes - 1, dia);
+
+  return (
+    dataTeste.getFullYear() === ano &&
+    dataTeste.getMonth() === mes - 1 &&
+    dataTeste.getDate() === dia
+  );
+};
+
+const dataLocalISO = () => {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const dia = String(agora.getDate()).padStart(2, "0");
+
+  return `${ano}-${mes}-${dia}`;
+};
+
+const validarHorario = (horario) => {
+  const correspondencia = horario.match(
+    /^(\d{2}):(\d{2})(?::(\d{2}))?$/
+  );
+
+  if (!correspondencia) {
+    return false;
+  }
+
+  const horas = Number(correspondencia[1]);
+  const minutos = Number(correspondencia[2]);
+  const segundos = Number(correspondencia[3] || 0);
+
+  return (
+    horas >= 0 &&
+    horas <= 23 &&
+    minutos >= 0 &&
+    minutos <= 59 &&
+    segundos >= 0 &&
+    segundos <= 59
+  );
+};
+
+/* =====================================================
+   ROTA INICIAL
+===================================================== */
+
 app.get("/", (req, res) => {
   res.send("API da RG Mecânica funcionando!");
 });
 
-// CADASTRO DE CLIENTE
+/* =====================================================
+   CADASTRO DE CLIENTE
+===================================================== */
+
 app.post("/cadastro", async (req, res) => {
   try {
     const {
@@ -47,8 +107,18 @@ app.post("/cadastro", async (req, res) => {
     } = req.body;
 
     if (
-      !nome || !email || !telefone ||
-      !dataNascimento || !cpf || !senha
+      typeof nome !== "string" ||
+      typeof email !== "string" ||
+      typeof telefone !== "string" ||
+      typeof dataNascimento !== "string" ||
+      typeof cpf !== "string" ||
+      typeof senha !== "string" ||
+      !nome.trim() ||
+      !email.trim() ||
+      !telefone.trim() ||
+      !dataNascimento.trim() ||
+      !cpf.trim() ||
+      !senha
     ) {
       return res.status(400).json({
         erro: "Todos os campos são obrigatórios.",
@@ -61,20 +131,55 @@ app.post("/cadastro", async (req, res) => {
     const cpfNormalizado =
       removerCaracteresNaoNumericos(cpf);
 
-    const [clientes] = await pool.execute(
-      `SELECT id_cli FROM cliente
-       WHERE email_cli = ? OR cpf_cli = ?
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalizado)) {
+      return res.status(400).json({
+        erro: "Informe um e-mail válido.",
+      });
+    }
+
+    if (cpfNormalizado.length !== 11) {
+      return res.status(400).json({
+        erro: "O CPF deve possuir 11 dígitos.",
+      });
+    }
+
+    if (!validarData(dataNascimento)) {
+      return res.status(400).json({
+        erro: "Informe uma data de nascimento válida.",
+      });
+    }
+
+    if (dataNascimento >= dataLocalISO()) {
+      return res.status(400).json({
+        erro: "A data de nascimento deve ser anterior à data atual.",
+      });
+    }
+
+    if (telefoneNormalizado.length < 10 ||
+        telefoneNormalizado.length > 13) {
+      return res.status(400).json({
+        erro: "Informe um telefone válido.",
+      });
+    }
+
+    if (senha.length < 8) {
+      return res.status(400).json({
+        erro: "A senha deve possuir pelo menos 8 caracteres.",
+      });
+    }
+
+    const consultaExistente = await pool.query(
+      `SELECT email_cli, cpf_cli
+       FROM cliente
+       WHERE email_cli = $1 OR cpf_cli = $2
        LIMIT 1`,
       [emailNormalizado, cpfNormalizado]
     );
 
-    if (clientes.length > 0) {
-      const [emailExistente] = await pool.execute(
-        "SELECT id_cli FROM cliente WHERE email_cli = ? LIMIT 1",
-        [emailNormalizado]
-      );
+    const existente = consultaExistente.rows[0];
 
-      if (emailExistente.length > 0) {
+    if (existente) {
+      if (existente.email_cli === emailNormalizado) {
         return res.status(409).json({
           erro: "E-mail já cadastrado.",
         });
@@ -90,11 +195,17 @@ app.post("/cadastro", async (req, res) => {
       BCRYPT_SALT_ROUNDS
     );
 
-    const [resultado] = await pool.execute(
-      `INSERT INTO cliente
-       (nome_cli, email_cli, telefone_cli, data_nasc_cli,
-        cpf_cli, senha_cli)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+    const resultado = await pool.query(
+      `INSERT INTO cliente (
+        nome_cli,
+        email_cli,
+        telefone_cli,
+        data_nasc_cli,
+        cpf_cli,
+        senha_cli
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id_cli, nome_cli, email_cli`,
       [
         nome.trim(),
         emailNormalizado,
@@ -105,20 +216,14 @@ app.post("/cadastro", async (req, res) => {
       ]
     );
 
-    const [novoCliente] = await pool.execute(
-      `SELECT id_cli, nome_cli, email_cli
-       FROM cliente WHERE id_cli = ?`,
-      [resultado.insertId]
-    );
-
     return res.status(201).json({
       mensagem: "Cadastro realizado com sucesso!",
-      cliente: novoCliente[0],
+      cliente: resultado.rows[0],
     });
   } catch (erro) {
-    console.error("Erro no cadastro:", erro);
+    erroBanco(erro);
 
-    if (erro.code === "ER_DUP_ENTRY") {
+    if (erro.code === "23505") {
       return res.status(409).json({
         erro: "E-mail ou CPF já cadastrado.",
       });
@@ -130,12 +235,20 @@ app.post("/cadastro", async (req, res) => {
   }
 });
 
-// LOGIN
+/* =====================================================
+   LOGIN DO CLIENTE
+===================================================== */
+
 app.post("/login", async (req, res) => {
   try {
     const { email, senha } = req.body;
 
-    if (!email || !senha) {
+    if (
+      typeof email !== "string" ||
+      typeof senha !== "string" ||
+      !email.trim() ||
+      !senha
+    ) {
       return res.status(400).json({
         erro: "E-mail e senha são obrigatórios.",
       });
@@ -143,20 +256,22 @@ app.post("/login", async (req, res) => {
 
     const emailNormalizado = normalizarEmail(email);
 
-    const [clientes] = await pool.execute(
+    const resultado = await pool.query(
       `SELECT id_cli, nome_cli, email_cli, senha_cli
-       FROM cliente WHERE email_cli = ? LIMIT 1`,
+       FROM cliente
+       WHERE email_cli = $1
+       LIMIT 1`,
       [emailNormalizado]
     );
 
-    if (clientes.length === 0) {
+    if (resultado.rows.length === 0) {
       return res.status(404).json({
         erro: "E-mail não localizado. Cadastre-se para fazer o login.",
         codigo: "EMAIL_NAO_ENCONTRADO",
       });
     }
 
-    const cliente = clientes[0];
+    const cliente = resultado.rows[0];
 
     const senhaCorreta = await bcrypt.compare(
       senha,
@@ -179,7 +294,7 @@ app.post("/login", async (req, res) => {
       },
     });
   } catch (erro) {
-    console.error("Erro no login:", erro);
+    erroBanco(erro);
 
     return res.status(500).json({
       erro: "Erro interno do servidor.",
@@ -187,7 +302,10 @@ app.post("/login", async (req, res) => {
   }
 });
 
-// CADASTRO DE VEÍCULO
+/* =====================================================
+   CADASTRO DE VEÍCULO
+===================================================== */
+
 app.post("/veiculos", async (req, res) => {
   try {
     const {
@@ -200,8 +318,16 @@ app.post("/veiculos", async (req, res) => {
     } = req.body;
 
     if (
-      !idCliente || !placa || !marca ||
-      !modelo || ano === undefined || ano === null || ano === ""
+      !idValido(idCliente) ||
+      typeof placa !== "string" ||
+      typeof marca !== "string" ||
+      typeof modelo !== "string" ||
+      !placa.trim() ||
+      !marca.trim() ||
+      !modelo.trim() ||
+      ano === undefined ||
+      ano === null ||
+      ano === ""
     ) {
       return res.status(400).json({
         erro: "Preencha todos os campos obrigatórios.",
@@ -221,7 +347,7 @@ app.post("/veiculos", async (req, res) => {
 
     if (
       !Number.isInteger(anoNumero) ||
-      anoNumero < 1900 ||
+      anoNumero < 1886 ||
       anoNumero > anoAtual + 1
     ) {
       return res.status(400).json({
@@ -248,34 +374,37 @@ app.post("/veiculos", async (req, res) => {
       }
     }
 
-    const [clientes] = await pool.execute(
-      "SELECT id_cli FROM cliente WHERE id_cli = ?",
-      [idCliente]
+    const cliente = await pool.query(
+      "SELECT id_cli FROM cliente WHERE id_cli = $1",
+      [Number(idCliente)]
     );
 
-    if (clientes.length === 0) {
+    if (cliente.rows.length === 0) {
       return res.status(404).json({
         erro: "Cliente não encontrado.",
       });
     }
 
-    const [veiculosExistentes] = await pool.execute(
-      "SELECT id_veiculo FROM veiculo WHERE placa = ?",
-      [placaNormalizada]
-    );
-
-    if (veiculosExistentes.length > 0) {
-      return res.status(409).json({
-        erro: "Esta placa já está cadastrada.",
-      });
-    }
-
-    const [resultado] = await pool.execute(
-      `INSERT INTO veiculo
-       (id_cliente, placa, marca, modelo, ano, quilometragem)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+    const resultado = await pool.query(
+      `INSERT INTO veiculo (
+        id_cliente,
+        placa,
+        marca,
+        modelo,
+        ano,
+        quilometragem
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING
+        id_veiculo,
+        id_cliente,
+        placa,
+        marca,
+        modelo,
+        ano,
+        quilometragem`,
       [
-        idCliente,
+        Number(idCliente),
         placaNormalizada,
         marca.trim(),
         modelo.trim(),
@@ -284,23 +413,22 @@ app.post("/veiculos", async (req, res) => {
       ]
     );
 
-    const [novoVeiculo] = await pool.execute(
-      `SELECT id_veiculo, id_cliente, placa, marca,
-              modelo, ano, quilometragem
-       FROM veiculo WHERE id_veiculo = ?`,
-      [resultado.insertId]
-    );
-
     return res.status(201).json({
       mensagem: "Veículo cadastrado com sucesso!",
-      veiculo: novoVeiculo[0],
+      veiculo: resultado.rows[0],
     });
   } catch (erro) {
-    console.error("Erro ao cadastrar veículo:", erro);
+    erroBanco(erro);
 
-    if (erro.code === "ER_DUP_ENTRY") {
+    if (erro.code === "23505") {
       return res.status(409).json({
         erro: "Esta placa já está cadastrada.",
+      });
+    }
+
+    if (erro.code === "23503") {
+      return res.status(404).json({
+        erro: "Cliente não encontrado.",
       });
     }
 
@@ -310,23 +438,40 @@ app.post("/veiculos", async (req, res) => {
   }
 });
 
-// LISTAR VEÍCULOS DE UM CLIENTE
+/* =====================================================
+   LISTAR VEÍCULOS DE UM CLIENTE
+===================================================== */
+
 app.get("/veiculos/:idCliente", async (req, res) => {
   try {
     const { idCliente } = req.params;
 
-    const [veiculos] = await pool.execute(
-      `SELECT id_veiculo, id_cliente, placa, marca,
-              modelo, ano, quilometragem
-       FROM veiculo
-       WHERE id_cliente = ?
-       ORDER BY id_veiculo DESC`,
-      [idCliente]
+    if (!idValido(idCliente)) {
+      return res.status(400).json({
+        erro: "Identificador do cliente inválido.",
+      });
+    }
+
+    const resultado = await pool.query(
+      `SELECT
+        id_veiculo,
+        id_cliente,
+        placa,
+        marca,
+        modelo,
+        ano,
+        quilometragem
+      FROM veiculo
+      WHERE id_cliente = $1
+      ORDER BY id_veiculo DESC`,
+      [Number(idCliente)]
     );
 
-    return res.status(200).json({ veiculos });
+    return res.status(200).json({
+      veiculos: resultado.rows,
+    });
   } catch (erro) {
-    console.error("Erro ao listar veículos:", erro);
+    erroBanco(erro);
 
     return res.status(500).json({
       erro: "Não foi possível carregar os veículos.",
@@ -334,31 +479,30 @@ app.get("/veiculos/:idCliente", async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
+/* =====================================================
+   EXCLUIR VEÍCULO
+===================================================== */
 
-
-
- // EXCLUIR VEÍCULO
 app.delete("/veiculos/:idVeiculo", async (req, res) => {
   try {
     const { idVeiculo } = req.params;
     const { idCliente } = req.body;
 
-    if (!idVeiculo || !idCliente) {
+    if (!idValido(idVeiculo) || !idValido(idCliente)) {
       return res.status(400).json({
-        erro: "Dados do veículo não informados.",
+        erro: "Dados do veículo não informados ou inválidos.",
       });
     }
 
-    const [resultado] = await pool.execute(
+    const resultado = await pool.query(
       `DELETE FROM veiculo
-       WHERE id_veiculo = ? AND id_cliente = ?`,
-      [idVeiculo, idCliente]
+       WHERE id_veiculo = $1
+         AND id_cliente = $2
+       RETURNING id_veiculo`,
+      [Number(idVeiculo), Number(idCliente)]
     );
 
-    if (resultado.affectedRows === 0) {
+    if (resultado.rowCount === 0) {
       return res.status(404).json({
         erro: "Veículo não encontrado para esta conta.",
       });
@@ -368,9 +512,9 @@ app.delete("/veiculos/:idVeiculo", async (req, res) => {
       mensagem: "Veículo excluído com sucesso!",
     });
   } catch (erro) {
-    console.error("Erro ao excluir veículo:", erro);
+    erroBanco(erro);
 
-    if (erro.code === "ER_ROW_IS_REFERENCED_2") {
+    if (erro.code === "23503") {
       return res.status(409).json({
         erro: "Este veículo possui agendamentos vinculados e não pode ser excluído.",
       });
@@ -382,12 +526,14 @@ app.delete("/veiculos/:idVeiculo", async (req, res) => {
   }
 });
 
+/* =====================================================
+   ATUALIZAR VEÍCULO
+===================================================== */
+
 app.put("/veiculos/:idVeiculo", async (req, res) => {
-  console.log("PUT /veiculos chamado!");
-  console.log("ID do veículo:", req.params.idVeiculo);
-  console.log("Dados recebidos:", req.body);
   try {
     const { idVeiculo } = req.params;
+
     const {
       idCliente,
       placa,
@@ -397,22 +543,92 @@ app.put("/veiculos/:idVeiculo", async (req, res) => {
       quilometragem,
     } = req.body;
 
-    const [resultado] = await pool.execute(
+    if (
+      !idValido(idVeiculo) ||
+      !idValido(idCliente) ||
+      typeof placa !== "string" ||
+      typeof marca !== "string" ||
+      typeof modelo !== "string" ||
+      !placa.trim() ||
+      !marca.trim() ||
+      !modelo.trim() ||
+      ano === undefined ||
+      ano === null ||
+      ano === ""
+    ) {
+      return res.status(400).json({
+        erro: "Preencha corretamente os dados do veículo.",
+      });
+    }
+
+    const placaNormalizada = normalizarPlaca(placa);
+    const anoNumero = Number(ano);
+    const anoAtual = new Date().getFullYear();
+
+    if (placaNormalizada.length !== 7) {
+      return res.status(400).json({
+        erro: "A placa deve possuir 7 caracteres.",
+      });
+    }
+
+    if (
+      !Number.isInteger(anoNumero) ||
+      anoNumero < 1886 ||
+      anoNumero > anoAtual + 1
+    ) {
+      return res.status(400).json({
+        erro: "Informe um ano válido.",
+      });
+    }
+
+    let quilometragemNumero = null;
+
+    if (
+      quilometragem !== "" &&
+      quilometragem !== null &&
+      quilometragem !== undefined
+    ) {
+      quilometragemNumero = Number(quilometragem);
+
+      if (
+        !Number.isFinite(quilometragemNumero) ||
+        quilometragemNumero < 0
+      ) {
+        return res.status(400).json({
+          erro: "Informe uma quilometragem válida.",
+        });
+      }
+    }
+
+    const resultado = await pool.query(
       `UPDATE veiculo
-       SET placa = ?, marca = ?, modelo = ?, ano = ?, quilometragem = ?
-       WHERE id_veiculo = ? AND id_cliente = ?`,
+       SET placa = $1,
+           marca = $2,
+           modelo = $3,
+           ano = $4,
+           quilometragem = $5
+       WHERE id_veiculo = $6
+         AND id_cliente = $7
+       RETURNING
+         id_veiculo,
+         id_cliente,
+         placa,
+         marca,
+         modelo,
+         ano,
+         quilometragem`,
       [
-        placa,
-        marca,
-        modelo,
-        ano,
-        quilometragem ?? null,
-        idVeiculo,
-        idCliente,
+        placaNormalizada,
+        marca.trim(),
+        modelo.trim(),
+        anoNumero,
+        quilometragemNumero,
+        Number(idVeiculo),
+        Number(idCliente),
       ]
     );
 
-    if (resultado.affectedRows === 0) {
+    if (resultado.rowCount === 0) {
       return res.status(404).json({
         erro: "Veículo não encontrado para esta conta.",
       });
@@ -420,11 +636,12 @@ app.put("/veiculos/:idVeiculo", async (req, res) => {
 
     return res.status(200).json({
       mensagem: "Veículo atualizado com sucesso!",
+      veiculo: resultado.rows[0],
     });
   } catch (erro) {
-    console.error("Erro ao atualizar veículo:", erro);
+    erroBanco(erro);
 
-    if (erro.code === "ER_DUP_ENTRY") {
+    if (erro.code === "23505") {
       return res.status(409).json({
         erro: "Já existe um veículo cadastrado com essa placa.",
       });
@@ -436,25 +653,28 @@ app.put("/veiculos/:idVeiculo", async (req, res) => {
   }
 });
 
-///////////////////////////////////////////////////////
-// AGENDAMENTO
-//////////////////////////////////////////////////////
+/* =====================================================
+   LISTAR SERVIÇOS
+===================================================== */
+
 app.get("/servicos", async (req, res) => {
   try {
-    const [servicos] = await pool.execute(`
-      SELECT
+    const resultado = await pool.query(
+      `SELECT
         id_servico,
         nome_serv,
         desc_serv,
         duracao_serv
       FROM servico
       WHERE status_serv = TRUE
-      ORDER BY nome_serv
-    `);
+      ORDER BY nome_serv`
+    );
 
-    return res.status(200).json({ servicos });
+    return res.status(200).json({
+      servicos: resultado.rows,
+    });
   } catch (erro) {
-    console.error("Erro ao buscar serviços:", erro);
+    erroBanco(erro);
 
     return res.status(500).json({
       erro: "Não foi possível carregar os serviços.",
@@ -462,8 +682,10 @@ app.get("/servicos", async (req, res) => {
   }
 });
 
+/* =====================================================
+   CRIAR AGENDAMENTO
+===================================================== */
 
-// POST /agendamentos
 app.post("/agendamentos", async (req, res) => {
   try {
     const {
@@ -476,87 +698,86 @@ app.post("/agendamentos", async (req, res) => {
     } = req.body;
 
     if (
-      !idCliente ||
-      !idVeiculo ||
-      !idServico ||
+      !idValido(idCliente) ||
+      !idValido(idVeiculo) ||
+      !idValido(idServico) ||
+      typeof dataAgend !== "string" ||
+      typeof horarioAgend !== "string" ||
       !dataAgend ||
       !horarioAgend
     ) {
       return res.status(400).json({
-        erro: "Preencha veículo, serviço, data e horário.",
+        erro: "Preencha veículo, serviço, data e horário corretamente.",
       });
     }
 
-    // Validar o formato da data e do horário
-    if (
-      !/^\d{4}-\d{2}-\d{2}$/.test(dataAgend) ||
-      !/^\d{2}:\d{2}(:\d{2})?$/.test(horarioAgend)
-    ) {
+    if (!validarData(dataAgend) || !validarHorario(horarioAgend)) {
       return res.status(400).json({
         erro: "Data ou horário inválido.",
       });
     }
 
-    const dataEscolhida = new Date(`${dataAgend}T00:00:00`);
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-
-    if (
-      Number.isNaN(dataEscolhida.getTime()) ||
-      dataEscolhida.toISOString().slice(0, 10) !== dataAgend ||
-      dataEscolhida < hoje
-    ) {
+    if (dataAgend < dataLocalISO()) {
       return res.status(400).json({
-        erro: "Selecione uma data válida, a partir de hoje.",
+        erro: "Selecione uma data a partir de hoje.",
       });
     }
 
-    // Confirmar que o veículo pertence ao cliente
-    const [veiculos] = await pool.execute(
+    if (
+      observacao !== undefined &&
+      observacao !== null &&
+      typeof observacao !== "string"
+    ) {
+      return res.status(400).json({
+        erro: "A observação deve ser um texto.",
+      });
+    }
+
+    const veiculo = await pool.query(
       `SELECT id_veiculo
        FROM veiculo
-       WHERE id_veiculo = ? AND id_cliente = ?`,
-      [idVeiculo, idCliente]
+       WHERE id_veiculo = $1
+         AND id_cliente = $2`,
+      [Number(idVeiculo), Number(idCliente)]
     );
 
-    if (veiculos.length === 0) {
+    if (veiculo.rows.length === 0) {
       return res.status(404).json({
         erro: "Veículo não encontrado para esta conta.",
       });
     }
 
-    // Confirmar que o serviço existe e está ativo
-    const [servicos] = await pool.execute(
+    const servico = await pool.query(
       `SELECT id_servico
        FROM servico
-       WHERE id_servico = ? AND status_serv = TRUE`,
-      [idServico]
+       WHERE id_servico = $1
+         AND status_serv = TRUE`,
+      [Number(idServico)]
     );
 
-    if (servicos.length === 0) {
+    if (servico.rows.length === 0) {
       return res.status(404).json({
         erro: "Serviço não encontrado ou indisponível.",
       });
     }
 
-    // Impedir duas solicitações no mesmo horário
-    const [conflitos] = await pool.execute(
+    const conflito = await pool.query(
       `SELECT id_agend
        FROM agendamento
-       WHERE data_agend = ?
-         AND horario_agend = ?
+       WHERE data_agend = $1
+         AND horario_agend = $2
          AND status_agend IN ('SOLICITADO', 'CONFIRMADO')
        LIMIT 1`,
       [dataAgend, horarioAgend]
     );
 
-    if (conflitos.length > 0) {
+    if (conflito.rows.length > 0) {
       return res.status(409).json({
         erro: "Esse horário já possui uma solicitação ou agendamento confirmado.",
       });
     }
 
-    const [resultado] = await pool.execute(
+    const resultado = await pool.query(
       `INSERT INTO agendamento (
         id_cliente,
         id_veiculo,
@@ -565,11 +786,13 @@ app.post("/agendamentos", async (req, res) => {
         horario_agend,
         status_agend,
         observacao
-      ) VALUES (?, ?, ?, ?, ?, 'SOLICITADO', ?)`,
+      )
+      VALUES ($1, $2, $3, $4, $5, 'SOLICITADO', $6)
+      RETURNING id_agend, status_agend`,
       [
-        idCliente,
-        idVeiculo,
-        idServico,
+        Number(idCliente),
+        Number(idVeiculo),
+        Number(idServico),
         dataAgend,
         horarioAgend,
         observacao?.trim() || null,
@@ -578,11 +801,17 @@ app.post("/agendamentos", async (req, res) => {
 
     return res.status(201).json({
       mensagem: "Agendamento solicitado com sucesso!",
-      id_agend: resultado.insertId,
-      status: "SOLICITADO",
+      id_agend: resultado.rows[0].id_agend,
+      status: resultado.rows[0].status_agend,
     });
   } catch (erro) {
-    console.error("Erro ao criar agendamento:", erro);
+    erroBanco(erro);
+
+    if (erro.code === "23503") {
+      return res.status(400).json({
+        erro: "Cliente, veículo ou serviço informado é inválido.",
+      });
+    }
 
     return res.status(500).json({
       erro: "Erro interno ao solicitar o agendamento.",
@@ -590,19 +819,21 @@ app.post("/agendamentos", async (req, res) => {
   }
 });
 
-
+/* =====================================================
+   LISTAR AGENDAMENTOS DO CLIENTE
+===================================================== */
 
 app.get("/agendamentos/cliente/:idCliente", async (req, res) => {
   try {
     const { idCliente } = req.params;
 
-    if (!Number.isInteger(Number(idCliente)) || Number(idCliente) <= 0) {
+    if (!idValido(idCliente)) {
       return res.status(400).json({
         erro: "Identificador do cliente inválido.",
       });
     }
 
-    const [agendamentos] = await pool.execute(
+    const resultado = await pool.query(
       `SELECT
         a.id_agend,
         a.data_agend,
@@ -618,14 +849,16 @@ app.get("/agendamentos/cliente/:idCliente", async (req, res) => {
         ON s.id_servico = a.id_servico
       INNER JOIN veiculo v
         ON v.id_veiculo = a.id_veiculo
-      WHERE a.id_cliente = ?
+      WHERE a.id_cliente = $1
       ORDER BY a.data_agend DESC, a.horario_agend DESC`,
       [Number(idCliente)]
     );
 
-    return res.status(200).json({ agendamentos });
+    return res.status(200).json({
+      agendamentos: resultado.rows,
+    });
   } catch (erro) {
-    console.error("Erro ao consultar agendamentos:", erro);
+    erroBanco(erro);
 
     return res.status(500).json({
       erro: "Não foi possível carregar seus agendamentos.",
@@ -633,15 +866,14 @@ app.get("/agendamentos/cliente/:idCliente", async (req, res) => {
   }
 });
 
-
-//////////////////////////////////////////
-//// HISTÓRICO
-/////////////////////////////////////////
-
+/* =====================================================
+   HISTÓRICO DE SERVIÇOS
+===================================================== */
 
 app.get("/historico/cliente/:idCliente", async (req, res) => {
   try {
     const idCliente = Number(req.params.idCliente);
+
     const {
       veiculo,
       servico,
@@ -658,53 +890,113 @@ app.get("/historico/cliente/:idCliente", async (req, res) => {
       });
     }
 
-    const condicoes = ["a.id_cliente = ?"];
+    const condicoes = ["a.id_cliente = $1"];
     const parametros = [idCliente];
 
+    const adicionarParametro = (valor) => {
+      parametros.push(valor);
+      return `$${parametros.length}`;
+    };
+
     if (veiculo && veiculo !== "todos") {
-      condicoes.push("v.id_veiculo = ?");
-      parametros.push(Number(veiculo));
+      if (!idValido(veiculo)) {
+        return res.status(400).json({
+          erro: "Filtro de veículo inválido.",
+        });
+      }
+
+      condicoes.push(
+        `v.id_veiculo = ${adicionarParametro(Number(veiculo))}`
+      );
     }
 
     if (servico && servico !== "todos") {
-      condicoes.push("COALESCE(at.id_servico, a.id_servico) = ?");
-      parametros.push(Number(servico));
+      if (!idValido(servico)) {
+        return res.status(400).json({
+          erro: "Filtro de serviço inválido.",
+        });
+      }
+
+      condicoes.push(
+        `COALESCE(at.id_servico, a.id_servico) = ${adicionarParametro(Number(servico))}`
+      );
     }
 
     if (valorMin !== undefined && valorMin !== "") {
-      condicoes.push("at.valor_servico >= ?");
-      parametros.push(Number(valorMin));
+      const minimo = Number(valorMin);
+
+      if (!Number.isFinite(minimo) || minimo < 0) {
+        return res.status(400).json({
+          erro: "Valor mínimo inválido.",
+        });
+      }
+
+      condicoes.push(
+        `at.valor_servico >= ${adicionarParametro(minimo)}`
+      );
     }
 
     if (valorMax !== undefined && valorMax !== "") {
-      condicoes.push("at.valor_servico <= ?");
-      parametros.push(Number(valorMax));
+      const maximo = Number(valorMax);
+
+      if (!Number.isFinite(maximo) || maximo < 0) {
+        return res.status(400).json({
+          erro: "Valor máximo inválido.",
+        });
+      }
+
+      if (
+        valorMin !== undefined &&
+        valorMin !== "" &&
+        maximo < Number(valorMin)
+      ) {
+        return res.status(400).json({
+          erro: "O valor máximo não pode ser menor que o mínimo.",
+        });
+      }
+
+      condicoes.push(
+        `at.valor_servico <= ${adicionarParametro(maximo)}`
+      );
     }
 
     if (periodo === "30") {
-      condicoes.push("at.data_inicio_atend >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)");
+      condicoes.push(
+        "at.data_inicio_atend >= CURRENT_DATE - INTERVAL '30 days'"
+      );
     } else if (periodo === "365") {
-      condicoes.push("at.data_inicio_atend >= DATE_SUB(CURDATE(), INTERVAL 365 DAY)");
+      condicoes.push(
+        "at.data_inicio_atend >= CURRENT_DATE - INTERVAL '365 days'"
+      );
     }
 
     if (busca && busca.trim()) {
-      condicoes.push(
-        "(s.nome_serv LIKE ? OR at.observacao LIKE ? OR at.motivo LIKE ? OR v.placa LIKE ? OR v.modelo LIKE ?)"
-      );
-
       const termo = `%${busca.trim()}%`;
-      parametros.push(termo, termo, termo, termo, termo);
+
+      const p1 = adicionarParametro(termo);
+      const p2 = adicionarParametro(termo);
+      const p3 = adicionarParametro(termo);
+      const p4 = adicionarParametro(termo);
+      const p5 = adicionarParametro(termo);
+
+      condicoes.push(
+        `(s.nome_serv ILIKE ${p1}
+          OR at.observacao ILIKE ${p2}
+          OR at.motivo ILIKE ${p3}
+          OR v.placa ILIKE ${p4}
+          OR v.modelo ILIKE ${p5})`
+      );
     }
 
     let ordenacao = "at.data_inicio_atend DESC";
 
     if (ordemValor === "menor") {
-      ordenacao = "at.valor_servico IS NULL, at.valor_servico ASC";
+      ordenacao = "at.valor_servico ASC NULLS LAST";
     } else if (ordemValor === "maior") {
-      ordenacao = "at.valor_servico IS NULL, at.valor_servico DESC";
+      ordenacao = "at.valor_servico DESC NULLS LAST";
     }
 
-    const [historico] = await pool.execute(
+    const resultado = await pool.query(
       `SELECT
         at.id_atend,
         at.data_inicio_atend,
@@ -730,6 +1022,8 @@ app.get("/historico/cliente/:idCliente", async (req, res) => {
       parametros
     );
 
+    const historico = resultado.rows;
+
     const totalGasto = historico.reduce(
       (total, item) => total + Number(item.valor_servico || 0),
       0
@@ -743,10 +1037,18 @@ app.get("/historico/cliente/:idCliente", async (req, res) => {
       },
     });
   } catch (erro) {
-    console.error("Erro ao consultar histórico:", erro);
+    erroBanco(erro);
 
     return res.status(500).json({
       erro: "Não foi possível carregar o histórico de serviços.",
     });
   }
+});
+
+/* =====================================================
+   INICIAR SERVIDOR
+===================================================== */
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
