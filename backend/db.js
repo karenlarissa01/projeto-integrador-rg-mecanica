@@ -13,10 +13,20 @@
 //   queueLimit: 0,
 // });
 
-import "dotenv/config";
-import { createClient } from "@supabase/supabase-js";
+import pg from "pg";
+import dotenv from "dotenv";
 
-export const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+dotenv.config();
+
+const { Pool } = pg;
+
+export const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
+
+pool.on("error", (err) => {
+  console.error("Erro inesperado no pool PostgreSQL:", err);
+});
